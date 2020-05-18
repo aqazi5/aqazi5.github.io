@@ -1,0 +1,398 @@
+---
+title: "Final Project: Analysis of Airbnb's Washington D.C. Data"
+author: "Aysha Qazi, Ummey Hossain, Isha Angadi"
+date: "5/13/2020"
+output: html_document
+---
+
+## Introduction
+
+Airbnb is a rapidly growing platform used worldwide by customers to provide unique travel experiences. Like any large company, Airbnb utilizes data analytics for a wide variety of reasons including for business performance, marketing, and predictions. Data analytics are extremely useful in this sector because companies like Airbnb use this data to improve their customers' experiences and grow their markets. It is also helpful for Airbnb users to determine how to plan their trips. Understanding the city analytics can help users decide which part of a city they want to explore, how to budget their living expenses and overall explore the reliability of the listing and the hosts based on the reviews. 
+
+## Tutorial
+
+In this tutorial, we will use several R libraries and services to analyze Airbnb data. Specifically, we will be analyzing the listings in Washington D.C. By analyzing and breaking down this data, we will be able to answer questions and recognize trends and patterns relating to Airbnb listings. The following topics will be covered:
+
+1. Installing Libraries
+2. Data Acquisition and Formatting
+3. Grouping and Plotting Data
+4. Expressing Data on a Map
+5. Regression Analysis
+6. Hypothesis Testing: Logisic Regression and Predictive Modeling
+7. Summary and References
+
+# 1. Installing Libraries
+
+First, we need to install the necessary libraries and packages to conduct this tutorial. To make this project replicable, these libraries are public and are available for use with RStudio version 3.4.4. We will install the packages with 
+
+$ install.packages("packageName")
+
+```{r installLibraries, include=TRUE, warning=FALSE}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(leaflet)
+library(broom)
+
+require(rvest)
+
+```
+
+# 2. Data Acquisition & Formatting
+
+Step one of the data pipeline starts here. Airbnb shares their datasets directly for analytics purposes. These datasets are split according to the city of travel, how many listings are available for that city, an extensive understanding of the reviews for each listing, overview of the neighborhoods and much more. For our tutorial, we decided to look further into the Airbnb options for Washington D.C. travelers. We directly downloaded the most recent Washington D.C. listings.csv file, dated to be updated on 04/24/20. We prepare the dataset by loading the file and observing the nature of the data. 
+
+Specifically, in the listings dataset, we have access to the following information: hosts, host IDs, name of the listings, the neighborhood of the listing, the exact latitude and langitude of the listing, the type of room, the price per night, how many minimum nights are required for the user, the number of reviews for that listing, the last posted review of the listing, how many reviews are written per month, how many listings there are per host, the number of days the listing is available for in a year, and the room type id. 
+
+We obtained our dataset from the following website: http://insideairbnb.com/get-the-data.html.
+
+```{r data, include=TRUE, warning=FALSE}
+# We will import the data with the "read_csv" function.
+
+listings <- read_csv("C:/Users/Aysha/Downloads/listings (1).csv")
+
+listings
+```
+As we can see there is a lot of data to parse through in the loaded listings.csv file. Therefore, we want to clean and tidy the data and look at items we will find more useful for our tutorial. Tidying data is the process of structuring a dataset so that it is easier to change. When manipulating a tidy dataset, we are analyzing the values by performing various operations such as making new columns for mean and standardization! Another way of manipulating the data is by changing the individual values of certain columns to allow us to perform these operations. We select only the columns we are interested in and also drop any columns with n/a entries. We will name the resulting table 'listings_data'. We also rename the columns for a cleaner format. The renamed columns are: "Host_ID", "Neighborhood", "Latitude", "Longitude", "Room_Type", "Price", "Minimum_Nights", "Number_of_Reviews", "Reviews_per_Month", "Host_Listings_Count", "Yearly_Availability", "Room_Type_ID".
+
+```{r tidy, echo=TRUE, warning=FALSE}
+
+listings %>% 
+  drop_na()
+
+head(listings)
+    
+listings_data <- select(listings, host_id, neighbourhood, latitude, longitude,room_type, price, minimum_nights, number_of_reviews, reviews_per_month, calculated_host_listings_count, availability_365, roomtype_id)
+
+listings_data
+head(listings_data)
+
+colnames(listings_data) = c("Host_ID",
+    "Neighborhood",
+    "Latitude",
+    "Longitude",
+    "Room_Type",
+    "Price",
+    "Minimum_Nights",
+    "Number_of_Reviews",
+    "Reviews_per_Month",
+    "Host_Listings_Count",
+    "Yearly_Availability",
+    "Room_Type_ID")
+  
+
+head(listings_data)
+
+
+```
+
+Great, the data has been cleaned and organized! The key features of the table that we will be focusing on are the following properties for each listing:
+
+1. Host ID - ID of the host of listing
+2. Neighborhood - where the listing is located in the D.C. area
+3. Latitude
+4. Longitude
+5. Room Type - the type of rooms are private rooms, shared rooms, hotel rooms, or entire homes/apartments. 
+6. Minimum Nights - minimum number of nights of stay for each user
+7. Number of Reviews - number of reviews of listing
+8. Reviews per Month - how many reviews the listing receives per month
+9. Host Listings Count - how many listings the host has
+10. Yearly Availability - how many days in a year for which the listing is available
+
+Now, we have a tidy data table we will be working with for the tutorial.
+
+# 3. Grouping and Plotting Data
+
+With a cleaner formatted data, it will be easier to parse for information that we want to specifically analyze. Now, we will be able to group our data according to trends and also plot it so we can visualize patterns and perform analytics. First, let's see how many records exist in listings_data. 
+
+```{r numRecords, echo=TRUE, warning=FALSE}
+nrow(listings_data)
+```
+
+There are a total of 9,342 entries in our dataset (number of listings in Washington D.C.). Next, we want to see how many distinct  neighborhoods there are in the D.C. area.
+```{r numDuplicateHosts, echo=TRUE, warning=FALSE}
+count(distinct(listings_data, Neighborhood))
+```
+Given that there are 39 different neighborhoods, let's take a look at the distributions of the different listings there are per neighborhood in the D.C. area. 
+
+```{r neighborhoods, include= TRUE, warning= FALSE}
+p <- ggplot(data = listings_data) + geom_histogram(aes(Neighborhood, fill = Neighborhood), stat = "count",alpha = 0.85, width = .5, position = position_dodge(width=10)) + 
+  theme_minimal(base_size=8) + xlab("") + ylab("") + theme(legend.position="none") + 
+  ggtitle("The Number of Listings in Each Area") + theme(axis.text.x = element_text(angle=20, hjust=1)) +
+coord_flip()
+p
+```
+
+As we can see, there is a huge variation in how many listings there are per neighborhood. It seems that within the Union Station neighborhood there are the most number of listings with about a 1000 listings. The second highest neighborhood is Columbia Heights and the third highest is Capitol Hill. Most of the listings are in the range of 125 listings up to about 500 listings per neighborhood. So for any user, there are plenty of options to choose from when traveling to Washington D.C. 
+
+Second, it might be helpful to see what the price ranges are for the Airbnb listings in the D.C. area. Understanding the price breakdown will help will budgeting for travelers and help hosts determine how to set the pricing of their own listings. We will demonstrate how to visualize the price distribution in the listings of the D.C. area using a cumulative distribution function. 
+
+```{r prices, include= TRUE, warning= FALSE}
+p <- ggplot(data = listings_data, aes(Price)) + 
+  stat_ecdf(geom = "step", color = '#fd5c63', lwd = 1.2) + 
+  ylab("Proportion") + xlab("Price") + theme_minimal(base_size = 13) + xlim(0, 1000) +
+  ggtitle("The Cumulative Distrubition of Listings Price") 
+p
+
+``` 
+
+The cumulative distribution plot indicates that about 80% of the Airbnb properties in Washington D.C. are less than 250 dollars, and the median price of Airbnb properties are about 125 dollars a night.
+
+Third, let's observe the kind of rooms there are for the listings for each of the neighborhoods in D.C. There are four different types of rooms per listing in the D.C. area. There are entire homes/apartments, there are private rooms, there are shared rooms and hotel rooms. It would be helpful to observe the breakdown of how many different different neighborhoods have each of the different room types.
+
+```{r roomTypeProportion, include= TRUE, warning= FALSE}
+p <- ggplot(data = listings_data) + geom_histogram(aes(Neighborhood, fill = Room_Type), stat = "count",alpha = 0.85, position = 'fill') + 
+  theme_minimal(base_size=8)+ xlab("") + ylab("") + 
+  ggtitle("The Proportion of Room Type in Each Area") + coord_flip()
+p
+``` 
+
+It seems that majority of the listings are entire hoom/apartments and private rooms. In the West End neighborhood there is the higheset number of entire home/apartment listings. In the Woodland/Fort Stattion neighborhood and Mayfair neighborhood it seems that there are the same number of private room listings. In the Woodland/Fort Station neighborhood specifically there is the highest number of shared room listings. There are not that many hotel room listings in the D.C. area. It seems that only 
+the Capitol Hill, Dupont Circle, Georgetown and Near Southwest neighborhoods have hotel rooms as listings. 
+
+Let's take a closer look at the breakdowns of the room types in the different neighborhoods. We want to see how many unique listings there are for each of the room types. We can display data for how many of the listings are private rooms, shared rooms, hotel rooms, and how many are entire homes/apartments. We can generate a table to show this data. 
+
+```{r roomTypes, echo=TRUE, warning=FALSE}
+df <- listings_data %>%
+  group_by(Room_Type) %>%
+  mutate(Counts = n())
+
+df
+
+roomTypes <- df[!duplicated(df$Counts),]
+
+roomTypes
+
+```
+
+We can visualize the total number of the different room type listings in a bar graph. This will help us determine the variablity in the options for the travelers and for Airbnb analytics. 
+```{r graphRoomTypes, echo=TRUE, warning=FALSE}
+
+p <-ggplot(data=roomTypes, aes(x=Room_Type, y=Counts)) +
+  geom_bar(stat="identity", color="#FF5A5F", fill="white")+
+  geom_text(aes(label=Counts), vjust=-0.3, size=3.5) +
+  theme_minimal() + ggtitle("Different Types of Rooms in Listings")
+
+p
+
+```
+
+Based off of this graph, we can see that we were right. Entire home/apartment listings has the highest number with 6,553 listings and hotel rooms are the lowest number of listings with only 46 listings total. Regardless, travelers have plenty of options to choose from to live comfortably during their travel to D.C. 
+
+Fourth, let's see how many of these listings are unique based on Host ID. This will allow us to see whether or not a single host has multiple listings.
+```{r numDuplicateHosts2, echo=TRUE, warning=FALSE}
+count(distinct(listings_data, Host_ID))
+```
+
+As we can see, there are 5,988 unique hosts. This means that there are hosts with multiple listings in Washington D.C. With this information, we can determine which host has the most listings in Washington D.C. by sorting the data according to Host_Listings_Count in descending order. We also make sure to remove duplicates so that we have distinct Host ID values. We narrow our dataframe down to the top 10 hosts. 
+
+```{r hostsData, echo=TRUE, warning=FALSE}
+top_hosts <- listings_data[order(-listings_data$Host_Listings_Count),]
+
+top_hosts <- top_hosts[!duplicated(top_hosts$Host_Listings_Count),]
+
+top_hosts <- top_hosts[1:10,]
+
+top_hosts
+
+```
+
+The top 10 hosts are spread across different neighboords, but it seems that the Downtown neighborhood two of the most active hosts with the most number of listings. Let's take a look at how the number of listings per top ten hosts vary in a bar graph. This will help us understand how the hosts and the listings vary. 
+
+```{r graphHostIDs, echo=TRUE, warning=FALSE}
+top_hosts$Host_ID <- factor(top_hosts$Host_ID) 
+
+
+p <-ggplot(data=top_hosts, aes(x=Host_ID, y=Host_Listings_Count)) +
+  geom_bar(stat="identity", color="white", fill="#FF5A5F")+
+  geom_text(aes(label=Host_Listings_Count), vjust=-0.3, size=3.5) +
+  theme_minimal() + ggtitle("Number of Listings of Top 10 Hosts")
+
+p
+```
+
+Host 48005494 has the highest number of listings with 272 listings. Then, Host 107434423 has the next highest 165 highest. The lowest number of listings for the top 10 hosts with the most listings is Host 30283594 with only 38 listings. 
+
+Now that we have a deeper understanding of the Airbnb listings data in the Washington D.C. area, we can continue to explore further. Let's see how we can visualize some of our understandings on a map. 
+
+# 4. Expressing Data on A Map
+
+Next, we will be expressing the Airbnb listings in Washington D.C. We will express the top 30 listings with the most reviews on a map of Washington D.C, as well as their prices so we can see how they vary by location. 
+
+First, we will create the dataframe that will be used in our map.
+
+```{r top_reviews, echo = TRUE, warning=FALSE}
+top_reviews <- listings_data[order(-listings_data$Number_of_Reviews),]
+top_reviews <- top_reviews[1:30,]
+
+top_reviews
+
+```
+Now, we can express these listings on a map!
+
+```{r mapListings, echo=TRUE, warning=FALSE}
+
+pal <- colorNumeric(
+  palette = "viridis",
+  domain = top_reviews$Price
+)
+
+dc_reviews<- leaflet(top_reviews) %>%
+  addTiles() %>%
+  addCircles(color=~pal(Price)) %>%
+  addLegend("topright", pal=pal, values=~Price,title="Price", opacity = 2) %>%
+  addControl("Prices for Top 30 Listings in D.C.", position = "bottomleft") %>%
+  setView(lat=38.902, lng=-77.03, zoom=11.25)
+
+
+dc_reviews
+```
+
+Based on the map, we observe a trend that the further away we move from the center of Washington D.C., the prices tend to decrease for the listings. 
+
+
+# 5. Regression Analysis
+Linear regression is used to predict the future data based on the patterns of the data we already have. We have the number of listings per neighborhood, we have observed the different room types for each of the listings, and we have also seen how prices are based on the location of D.C. One of our larger questions and concerns for this data is how much does the price vary for each of the neighborhoods in the D.C. area. Let's take a look at how the price distribution works for the top 5 neighborhoods. In order to do this, we will create a dataframe of listings within the top 5 neighborhoods.
+
+```{r top5neighborhoods, echo=TRUE, warning=FALSE}
+
+df <- listings_data %>%
+  group_by(Neighborhood) %>%
+  mutate(Counts = n())
+
+df
+
+new_data <- df[!duplicated(df$Counts),]
+
+top_neighborhoods <- new_data[order(-new_data$Counts),]
+
+
+top_neighborhoods <- top_neighborhoods[1:5,]
+
+top_neighborhoods
+
+```
+Then, we will filter the data we have for those top 5 neighborhoods that we have found. 
+```{r filterData, echo=TRUE, warning=FALSE}
+
+new_data <- listings_data[listings_data$Neighborhood %in% c("Union Station, Stanton Park, Kingman Park", "Columbia Heights, Mt. Pleasant, Pleasant Plains, Park View", "Capitol Hill, Lincoln Park", "Dupont Circle, Connecticut Avenue/K Street", "Edgewood, Bloomingdale, Truxton Circle, Eckington"), ]
+
+new_data <- select(new_data, Neighborhood, Price)
+
+new_data
+
+```
+
+At this point, we have all of the data of the top 5 neighborhoods and their respective prices. So next, we need to find the distribution of prices across those neighborhoods. We can now create a violin plot to express the price distribution for these 5 neighborhoods. These linear regression models depict how price is correlated with the top 5 neighborhoods.
+
+```{r violin, echo=TRUE, warning=FALSE}
+library(ggplot2)
+# Basic violin plot
+p <- ggplot(new_data, aes(x=Neighborhood, y=Price)) + 
+  geom_violin(trim=FALSE, fill = "#FF5A5F") + ylim(0, 850) + ggtitle("Distribution of Top 5 Neighborhoods") +
+        theme(axis.text.x = element_text(angle=15, hjust=1)) + geom_boxplot(width=0.1)
+
+# Rotate the violin plot
+
+p
+
+
+```
+
+Now, we have graphed the distribution of prices across the top 5 neighborhoods. We can observe some trends about the distribution of prices for Airbnb listings in neighborhoods in Washington D.C. Columbia Heights and Dupont Circle have very similar distributions. All 5 neighborhoods mostly have listings under 200 dollars. Capitol Hill and Union Station have the largest standard deviations, meaning that they have the greatest range of prices. Listings within Columbia Heights and Edgewood are mostly within the 100 dollar range. 
+
+
+# 6. Hypothesis Testing: Logisic Regression and Predictive Modeling
+From our data, we are able to determine which factors have the greatest effect on the price of a listing. We will now use regression analysis to check if the room types and the number of reviews affect the price and to what extent.
+Regression analysis is a set of statistical processes for estimating the relationships between a dependent variable and one or more independent variables. 
+```{r regression, include= TRUE}
+summary(listings_data)
+#We check if the price data is above or below 100, if it is below it is set as 0, else as 1. This is done so that we can use the price as one of the factors in our regression analysis
+price_data <- ifelse(listings_data$Price < 100 , 0, 1)
+
+listings_data$Room_Type_ID <- factor(listings_data$Room_Type_ID)
+
+#We use glm to do the regression analysis 
+mylogit <- glm(price_data ~ Room_Type_ID, data = listings_data, family = "binomial")
+broom::tidy(mylogit)%>%
+  knitr::kable()
+
+summary(mylogit)
+```
+We can use the confint function to obtain confidence intervals for the coefficient estimates. 
+```{r confidence, include= TRUE}
+confint(mylogit)
+confint.default(mylogit)
+```
+We now run the regression model on price data, room type and number of reviews.
+```{r regression2, include = TRUE}
+
+mylogit2 <- lm(price_data ~ Room_Type_ID + Number_of_Reviews , data=listings_data)
+broom::tidy(mylogit2) %>%
+  knitr::kable()
+summary(mylogit2)
+
+```
+
+In order to reject the null hypothesis, the p-value for the individual categories must be below our alpha value of 0.05. When we reject the null hypothesis, that means that specific factors do not have an effect on the price of the rentable space.
+As you can see from the charts, the p-value is consistently below 0.05, in both cases with and without the number of reviews therefore we can reject the null hypothesis for those factors. 
+Our hypothesis is that choosing an Airbnb based on reviews is more useful than just checking its price and room type. 
+Now we will compare graphs of fitted vs residuals to see how accurate our assumptions were from our hypothesis testing above. Through this process, we will figure out how far off our model is from the actual data point.
+
+
+```{r predict, include=TRUE}
+#prices and room type - residuals above and farther from 0 
+augmented_data1 <- mylogit %>%
+  augment() %>%
+  select(-.se.fit, -.hat, -.sigma, -.cooksd, -.std.resid)
+augmented_data1 %>%
+  ggplot(aes(x=.fitted, y=.resid)) +
+    geom_violin(fill = "#FF5A5F")+
+  ggtitle("Analysis of price and room type") 
+#number of reviews are effected based on price and room type- residuals closer to 0 
+augmented_data2 <- mylogit2 %>%
+  augment() %>%
+  select(-.se.fit, -.hat, -.sigma, -.cooksd, -.std.resid)
+augmented_data2 %>%
+  ggplot(aes(x=.fitted, y=.resid)) +
+  geom_violin(fill = "#00A699")+
+  ggtitle("Analysis of price, room type and number of reviews") 
+
+  augmented_data1
+augmented_data2
+```
+
+Above, you can see that for price and room type(mylogit), the residuals are above and farther from 0, and for price, room type and number of reviews (mylogit2), the residuals are closer to 0. With the high frequencies around zero, we believe that our hypothesis is correct. Even though room type has an effect on the price, the number of reviews and price are correlated. Additionally the axis on mylogit2 violin plot is finer and focused on values between 0 and 1. 
+
+# 7. Summary and References
+
+Yay! You have completed your tutorial on Airbnb's in Washington D.C. and the factors that affect their prices. Now when you visit D.C., you will know the important factors like number of reviews, room types and  neighborhoods to gauge before picking your AirBnb. In this tutorial we we answered the questions like "Where are the best neighborhoods to be in while in D.C.?",  "How does the price change based on room type and reviews?". You can now ask your own questions about data and find answers to them. It is important to begin your journey by asking motivating questions and questioning the accurancy of the dataset used to answer those questions.
+
+Some of the motivating questions we had in this tutorial were: 
+
+1. Where are the top 5 hosts in D.C.? We chose to run our tutorial on host IDs instead of names to respect the privacy of the hosts. You can choose what values you would like to add or omit accordingly.
+
+2. How many listings do the top 5 hosts in D.C. have?  
+
+3. What are the different room types based on the number of listings from the top 5 hosts? 
+
+4. What are the prices of the top 30 listings in D.C. and where are they located? We used the map to display these locations effectively. 
+
+5. Based on the prices and listings, what are the best neighborhoods to live in? 
+
+We then did a regression analysis on the price, room type and the effects of the number of reviews on those factors. We hope you enjoyed our tutorial as much as we enjoyed creating it. We encourage you to continue exploring the World of Data Science and have the power to make informed decisions based on data. 
+
+For further information on data science and machine learning, you can visit:
+
+1. https://mlr.mlr-org.com/ for your machine learning needs
+
+2. http://101.datascience.community/ for short posts to advance your learning a little every day 
+
+3. https://www.oreilly.com/data/newsletter.html for data science and business focused information 
+
+4.http://www.datascienceassn.org/ To find your own data science community and even possibly get a certification
+
+5. https://nips.cc/ To meet minds like yours and share your notes on information processing in different areas 
+
+Good Luck and Stay Safe! 
